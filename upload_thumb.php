@@ -37,6 +37,38 @@ function upload_thumbnail_admin(){
 function the_form(){
 	?>	
 		
+		<script type="text/javascript">
+		<!--
+		
+			Dropzone.options.mydropzone = { 
+			  init: function() {
+			    var mydropzone = this;
+			    
+			    jQuery("#clear_images").click(function() {
+				    
+					// remove all the files and start a new session.
+			    	mydropzone.removeAllFiles();
+			    	jQuery('#width').val('');
+			    	jQuery('#height').val('');
+			    	
+			      });
+			      
+			    mydropzone.on("success", function(file, responseText) {
+	
+					var msg = jQuery.parseJSON(responseText);
+
+					//display the red cross if the file was not replaced.
+					if(msg.level == 0){
+
+						file.previewElement.classList.add("dz-error");
+						file.previewElement.querySelector("[data-dz-errormessage]").textContent = msg.msg;
+					}
+				});
+			  }
+			};
+		
+		-->
+		</script>
 		
 		<div id="dashboard-widgets-wrap">
 		<div id="dashboard-widgets" class="metabox-holder columns-2">
@@ -44,13 +76,7 @@ function the_form(){
 		<div id="normal-sortables" class="meta-box-sortables ui-sortable">
 			<div id="dashboard_right_now" class="postbox ">
 			
-				<div class="handlediv" title="Zum umschalten klicken"><br></div> 
-				
-				<h3 class="hndle">
-					<span>Thumbnail Dimensions</span>
-				</h3>
-				<div>
-				<form  id = "mydropzone" class = "" action="<?php echo site_url();?>/wp-admin/admin-ajax.php?action=upload_thumb" method="post" enctype="multipart/form-data">
+				<form  id = "mydropzone" class = "dropzone" action="<?php echo site_url();?>/wp-admin/admin-ajax.php?action=upload_thumb" method="post" enctype="multipart/form-data">
 					
 					<table class = "form-table" >
 						<tr valign = "top">
@@ -69,40 +95,11 @@ function the_form(){
 					</table>
 					
 				</form>
+				<br>
+				<input style = "float:center !important;" type="reset" value="Clear Images" accesskey="p" id="clear_images" class="button button-primary button-large" name="save">
 				</div>
 			</div>
 		</div></div></div>
-		</div>
-		
-		<script type="text/javascript">
-		<!--
-			jQuery(document).ready(function(){
-
-			
-				
-				var myDropzone = jQuery("#my-dropzone").data("dropzone");
-				
-				myDropzone.on("success", function(file, responseText) {
-					
-					var msg = jQuery.parseJSON(responseText.substring(0, responseText.length - 1));
-
-					if(msg.level == 0){
-						alert('no uploaded');
-						jQuery('.success-mark').hide();
-						jQuery('.error-mark').show();
-					}else{
-						alert('yes uploaded');
-						jQuery('.success-mark').show();
-						jQuery('.error-mark').hide();
-					}
-					
-					jQuery('.data-dz-errormessage').html(msg.msg);
-					
-				});
-			});
-		//-->
-		</script>
-		
 		
 <?php }
 
@@ -118,12 +115,8 @@ function init_plugin(){
 
 	//load the js script files.
 	wp_enqueue_script("jquery");
-	wp_enqueue_script( 'dropzone-amd-module.js', plugins_url( '/js/dropzone-amd-module.js', __FILE__ ));
-	//wp_enqueue_script( 'dropzone.js', plugins_url( '/js/dropzone.js', __FILE__ ));
-	
-	
-
-	
+	//wp_enqueue_script( 'dropzone-amd-module.js', plugins_url( '/js/dropzone-amd-module.js', __FILE__ ));
+	wp_enqueue_script( 'dropzone.js', plugins_url( '/js/dropzone.js', __FILE__ ));
 	
 	
 	//register the ajax handler for handeling of the forms submit values.
@@ -151,13 +144,14 @@ function ajaxResponse(){
 	
 	$uploaded_images = $_FILES['file'];
 	
+	
 	$file_names = $uploaded_images['name'];
 	
 	
 	
 	$path = $upload_path['path'].'/';
 	
-	
+	//get the list of the existing files in the upload folder.
 	$existing_files = ListFiles($upload_path['basedir']);
 	
 	
@@ -169,66 +163,76 @@ function ajaxResponse(){
 
 	
 	$file_size = filesize($_FILES['file']['tmp_name']);
-			
+
+	//check the size of the file. If it is greater then 2 MB responds error.
 	if($file_size >(2*1024*1024)){
 		
 		$level = 0;
-		$message = '<div class="error below-h2" id="error"><p><b>'.$uploaded_images['name'].'</b> was not uploaded. The file must be less then 2 MB. <br></p></div>';
+		$message = 'The file must be less then 2 MB.';
 	
 	}else{
 
+		// check the dimentions of the image and checks with the one specified in the input form.
 		if($width != $size[0] &&  $height != $size[1] ){
 
 			$level = 0;
-			$message = '<div class="error below-h2" id="error"><p><b>'.$uploaded_images['name'].'</b> was not uploaded. There was mismatch in the specified and actual height or width of the image  <br></p></div>';
+			$message = 'Mismatch in the specified and actual height or width of the image.';
 
 		}else{
 
 			$old_file = $upload_path['path'].'/'.$uploaded_images['name'];
 
 			$uploading_path = '';
-
+			
 			$error_no_file = TRUE;
 			$image_name_array = explode(".", $uploaded_images['name']);
 				
 			foreach ($existing_files as $existing_file){
 					
 				$file_path_info = pathinfo($existing_file);
-					
+				
+				// check if the file with the same name exists in the upload folder or not if not throw and error.
 				if($uploaded_images['name'] == $file_path_info['basename']){
 
 					$uploading_path = $file_path_info['dirname'];
+					
 
 					$error_no_file = FALSE;
 				}
 			}
 
 			if( $error_no_file != TRUE){
-					
+				
+				//check the file extension.
 				if(!in_array($ext, $allowed_file)){
 
 					$level = 0;
-					$message ='<div class="error below-h2" id="error"><p><b>'.$uploaded_images['name'].'</b> was not uploaded. Please make sure it is in <i>.jpg </i> or <i>.png</i> format <br></p></div>';
+					$message ='Please make sure it is in .jpg or .png format ';
 
 				}else{
 
-						$origen =$uploaded_images['name'][$i];
+						$origen =$uploaded_images['name'];
+						
 								
-						$file_name         = substr($origen, 0, strlen($origen)-4);
+						 $file_name         = substr($origen, 0, strlen($origen)-4);
+						
 						$file_extension  = substr($origen, strlen($origen)-4, strlen($origen));
 						$frand = $file_name.'-'.$width .'x'.$height.$file_extension;
-									
-						$destinoFull = $destinoDir.$frand;
-							
+
+						
+						//remane the file according to the dimension that are provided in the input form.
+						 $destinoFull = $destinoDir.$frand;
+
+						//replace the file 
 						if(move_uploaded_file($_FILES['file']['tmp_name'],$uploading_path.'/'.$destinoFull)){
 
 							$level = 1;
-							$message ='<div style = "background-color: #b0edbb;" class="updated below-h2" id="message"><p><b>'.$uploaded_images['name'].'</b> has been sucessfully replaced. <br></p></div>';
+							$message ='Sucessfully replaced.';
 
 						}else{
 
 							$level = 0;
-							$message = '<div class="error below-h2" id="message"><p>Oops!!! Something went wrong. Could not upload <b>'.$uploaded_images['name'].'</b>. Please try again.<br></p></div>';
+							$message = 'Oops!!! Something went wrong. Could not upload. Please try again.';
 						}
 
 						}
@@ -236,18 +240,13 @@ function ajaxResponse(){
 			}else{
 
 				$level = 0;
-				$message ='<div class="error below-h2" id="message"><p>The file <b>'.$uploaded_images['name']. '</b> was not found on the server. Please check the filename.<br></p></div>';
+				$message ='File not found on the server. Please check the filename.';
 			}
 		}
 	}
 	
-	/* if($level ==1){
-		echo json_encode(array('sucess'=>200));
-	}else{
-		echo json_encode(array('error'=>400));
-	}
-	 */
 	echo json_encode(array('level' => $level, 'msg' => $message));
+	die();
 		
 	
 }
@@ -263,6 +262,19 @@ function ListFiles($dir) {
 			if($file != "." && $file != ".." && $file[0] != '.') {
 				if(is_dir($dir . "/" . $file)) {
 					$inner_files = ListFiles($dir . "/" . $file);
+					if(is_array($inner_files)) $files = array_merge($files, $inner_files);
+				} else {
+					array_push($files, $dir . "/" . $file);
+				}
+			}
+		}
+
+		closedir($dh);
+		return $files;
+	}
+}
+
+?>;
 					if(is_array($inner_files)) $files = array_merge($files, $inner_files);
 				} else {
 					array_push($files, $dir . "/" . $file);
